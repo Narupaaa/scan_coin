@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Glass MVC Dashboard</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* --- CSS VIEW SECTION --- */
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --text-color: #ffffff;
+            --success-color: #00b894;
+            --sidebar-width: 260px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: linear-gradient(to right, #2c5364, #203a43, #0f2027);
+            min-height: 100vh;
+            color: var(--text-color);
+            display: flex;
+        }
+
+        /* --- Sidebar Style --- */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .brand {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 3rem;
+            color: var(--success-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px 20px;
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+            border: 1px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+        }
+
+        .nav-link.active {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            font-weight: 600;
+        }
+
+        /* --- Main Content Area --- */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .page-view {
+            display: none;
+            /* ซ่อนทุกหน้าก่อน */
+            width: 100%;
+            max-width: 800px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .page-view.active {
+            display: block;
+        }
+
+        /* แสดงเฉพาะหน้าที่ Active */
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- Glass Card --- */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            padding: 2rem;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            text-align: center;
+        }
+
+        /* --- Components --- */
+        h1 {
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+        }
+
+        input {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 10px 20px;
+            color: white;
+            outline: none;
+        }
+
+        button {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+        }
+
+        .btn-success {
+            background: var(--success-color);
+        }
+
+        button:hover {
+            transform: scale(1.02);
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .data-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 400px;
+            overflow-y: auto;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            color: #e2e8f0;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            :root {
+                --sidebar-width: 0px;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                bottom: 0;
+                top: auto;
+                flex-direction: row;
+                justify-content: space-around;
+                padding: 10px;
+                border-right: none;
+                border-top: 1px solid var(--glass-border);
+                background: #0f2027;
+            }
+
+            .brand {
+                display: none;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding-bottom: 80px;
+            }
+
+            .nav-link span {
+                display: none;
+            }
+
+            /* ซ่อนข้อความเหลือแต่ไอคอนในมือถือ */
+        }
+
+        .result-box-wrapper {
+            position: relative;
+            margin-top: 1.5rem;
+        }
+
+        .data-box {
+            margin-top: 0 !important;
+            /* Reset margin since wrapper handles it */
+        }
+
+        .btn-copy {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 5px 12px;
+            font-size: 0.8rem;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            opacity: 0.6;
+            transition: 0.3s;
+            border-radius: 8px;
+        }
+
+        .btn-copy:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="sidebar">
+        <div class="brand">🚀 CryptoMVC</div>
+
+        <div class="nav-link active" data-target="view-tracker">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            <span>K-Line Tracker</span>
+        </div>
+
+        <div class="nav-link" data-target="view-scanner">
+            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>RSI Scanner</span>
+        </div>
+    </nav>
+
+    <div class="main-content">
+
+        <div id="view-tracker" class="page-view active">
+            <div class="card">
+                <h1>Binance Data Loader (1H & 1D)</h1>
+                <div class="input-group">
+                    <input type="text" id="symbolInput" placeholder="Ex. BTCUSDT" value="">
+                    <button class="btn-success" id="btnFetchTracker">ดึงข้อมูล</button>
+                </div>
+                <div class="result-box-wrapper">
+                    <div id="trackerResult" class="data-box">รอการค้นหา...</div>
+                    <button class="btn-copy" data-target="trackerResult">Copy</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-scanner" class="page-view">
+            <div class="card">
+                <h1>RSI (7) > 70 Scanner</h1>
+                <p style="margin-bottom: 1rem; color: #aaa;">สแกนหา Top Gainers ที่ RSI Overbought</p>
+                <button class="btn-primary" id="btnStartScan" style="width: 100%;">🔍 เริ่มสแกนตลาด</button>
+                <div class="result-box-wrapper">
+                    <div id="scannerResult" class="data-box">กดปุ่มเพื่อเริ่มสแกน...</div>
+                    <button class="btn-copy" data-target="scannerResult">Copy</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // =======================
+        // 1. MODEL: Data & Logic
+        // =======================
+        const Model = {
+            // คำนวณ RSI
+            calculateRSI: function (closes, period = 7) {
+                if (closes.length < period + 1) return 0;
+                let gains = 0, losses = 0;
+                for (let i = closes.length - period; i < closes.length; i++) {
+                    let change = closes[i] - closes[i - 1];
+                    if (change >= 0) gains += change; else losses += Math.abs(change);
+                }
+                let avgGain = gains / period;
+                let avgLoss = losses / period;
+                if (avgLoss === 0) return 100;
+                let rs = avgGain / avgLoss;
+                return 100 - (100 / (1 + rs));
+            },
+
+            // ดึงข้อมูล K-Line (Tracker)
+            fetchTrackerData: async function (symbol) {
+                const p1 = $.get(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=100`);
+                const p2 = $.get(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1d&limit=30`);
+                const p3 = $.get(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1w&limit=30`);
+                const p4 = $.get(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1M&limit=30`);
+
+                return Promise.all([p1, p2, p3, p4]);
+            },
+
+            // สแกนหา RSI (Scanner)
+            scanMarket: async function (onProgressCallback) {
+                // 1. ดึง Ticker ทั้งหมด
+                onProgressCallback("Fetching Tickers...");
+                const tickers = await $.get('https://api.binance.com/api/v3/ticker/24hr');
+
+                // 2. กรองและเรียงลำดับ
+                let candidates = tickers.filter(t => t.symbol.endsWith('USDT') && parseFloat(t.quoteVolume) > 10000000);
+                candidates.sort((a, b) => parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent));
+                candidates = candidates.slice(0, 50); // เช็คแค่ 50 ตัวแรก
+
+                let foundCoins = [];
+                onProgressCallback(`Checking Top ${candidates.length} candidates...`);
+
+                // 3. วนลูปเช็ค
+                for (const coin of candidates) {
+                    if (foundCoins.length >= 10) break;
+                    try {
+                        const klines = await $.get(`https://api.binance.com/api/v3/klines?symbol=${coin.symbol}&interval=1d&limit=40`);
+                        const closes = klines.map(k => parseFloat(k[4]));
+                        const rsi = this.calculateRSI(closes, 7);
+
+                        if (rsi > 70) {
+                            foundCoins.push({ symbol: coin.symbol, rsi: rsi, klines: klines });
+                            onProgressCallback(`เจอแล้ว! ${coin.symbol} (RSI: ${rsi.toFixed(2)})`);
+                        }
+                        await new Promise(r => setTimeout(r, 50)); // กัน Rate Limit
+                    } catch (e) { console.error(e); }
+                }
+                return foundCoins;
+            }
+        };
+
+        // =======================
+        // 2. VIEW: UI Updates
+        // =======================
+        const View = {
+            // สลับหน้าจอ
+            switchPage: function (targetId) {
+                $('.page-view').removeClass('active');
+                $('#' + targetId).addClass('active');
+
+                $('.nav-link').removeClass('active');
+                $(`.nav-link[data-target="${targetId}"]`).addClass('active');
+            },
+
+            // แสดงผลหน้า Tracker (รับ parameter เพิ่มให้ครบ)
+            renderTracker: function (symbol, data1h, data1d, data1w, data1m) {
+                let html = `>>> ${symbol} DATA SET <<<\n`;
+
+                // --- 1. Process 1H ---
+                if (data1h && data1h.length > 0) {
+                    html += `=== TIMEFRAME 1H (100) ===\n`;
+                    $.each(data1h, (i, k) => {
+                        let label = (i === data1h.length - 1) ? " <--- [CURRENT]" : "";
+                        html += `1H-${i + 1}: H:${k[2]} L:${k[3]} C:${k[4]} V:${k[5]}${label}\n`;
+                    });
+                }
+
+                // --- 2. Process 1D ---
+                if (data1d && data1d.length > 0) {
+                    html += `\n=== TIMEFRAME 1D (30) ===\n`;
+                    $.each(data1d, (i, k) => {
+                        let label = (i === data1d.length - 1) ? " <--- [CURRENT]" : "";
+                        html += `1D-${i + 1}: H:${k[2]} L:${k[3]} C:${k[4]} V:${k[5]}${label}\n`;
+                    });
+                }
+
+                // --- 3. Process 1W (Weekly) ---
+                // เพิ่มการเช็คว่ามี data1w ส่งมาไหม เพื่อกัน Error
+                if (data1w && data1w.length > 0) {
+                    html += `\n=== TIMEFRAME 1W (30) ===\n`;
+                    $.each(data1w, (i, k) => {
+                        let label = (i === data1w.length - 1) ? " <--- [CURRENT]" : "";
+                        html += `1W-${i + 1}: H:${k[2]} L:${k[3]} C:${k[4]} V:${k[5]}${label}\n`;
+                    });
+                }
+
+                // --- 4. Process 1M (Monthly) ---
+                // เพิ่มการเช็คว่ามี data1m ส่งมาไหม เพื่อกัน Error
+                if (data1m && data1m.length > 0) {
+                    html += `\n=== TIMEFRAME 1M (30) ===\n`;
+                    $.each(data1m, (i, k) => {
+                        let label = (i === data1m.length - 1) ? " <--- [CURRENT]" : "";
+                        html += `1M-${i + 1}: H:${k[2]} L:${k[3]} C:${k[4]} V:${k[5]}${label}\n`;
+                    });
+                }
+
+                // Render ออกสู่หน้าจอ "ครั้งเดียว" เพื่อประสิทธิภาพที่ดีที่สุด
+                $('#trackerResult').text(html);
+            },
+
+            // แสดงผลหน้า Scanner (Progress & Final)
+            updateScannerStatus: function (msg) {
+                $('#scannerResult').text(msg);
+            },
+
+            renderScannerResults: function (results) {
+                if (results.length === 0) return $('#scannerResult').text("ไม่พบเหรียญ RSI > 70 ในกลุ่มนี้");
+
+                let html = "";
+                $.each(results, (i, item) => {
+                    html += `>>> ${item.symbol} | RSI: ${item.rsi.toFixed(2)} <<<\n`;
+                    let last30 = item.klines.slice(-30).reverse();
+                    $.each(last30, (j, k) => {
+                        let status = parseFloat(k[4]) > parseFloat(k[1]) ? "🟢" : "🔴";
+                        html += `D-${j + 1}: O:${k[1]} C:${k[4]} V:${k[5]} ${status}\n`;
+                    });
+                    html += "\n--------------------------\n";
+                });
+                $('#scannerResult').text(html);
+            },
+
+            setLoading: function (btnId, isLoading, text) {
+                const $btn = $(btnId);
+                if (isLoading) {
+                    $btn.prop('disabled', true).data('org-text', $btn.text()).text(text);
+                } else {
+                    $btn.prop('disabled', false).text($btn.data('org-text'));
+                }
+            }
+        };
+
+        // =======================
+        // 3. CONTROLLER: Events
+        // =======================
+        const Controller = {
+            init: function () {
+                this.setupNav();
+                this.setupTracker();
+                this.setupScanner();
+                this.setupCopyButtons();
+            },
+
+            setupNav: function () {
+                // คลิกเมนู Sidebar
+                $('.nav-link').click(function () {
+                    const target = $(this).data('target');
+                    View.switchPage(target);
+                });
+            },
+
+            setupTracker: function () {
+                $('#btnFetchTracker').click(function () {
+                    const symbol = $('#symbolInput').val().toUpperCase().trim();
+                    if (!symbol) return alert("กรุณากรอกชื่อเหรียญ");
+
+                    View.setLoading('#btnFetchTracker', true, 'Loading...');
+                    View.updateScannerStatus('กำลังโหลด...');
+
+                    Model.fetchTrackerData(symbol)
+                        .then(([d1h, d1d, d1w, d1m]) => {
+                            View.renderTracker(symbol, d1h, d1d, d1w, d1m);
+                        })
+                        .catch(err => {
+                            $('#trackerResult').text("Error: ไม่พบเหรียญหรือ API ขัดข้อง");
+                        })
+                        .finally(() => {
+                            View.setLoading('#btnFetchTracker', false);
+                        });
+                });
+            },
+
+            setupScanner: function () {
+                $('#btnStartScan').click(async function () {
+                    View.setLoading('#btnStartScan', true, 'Scanning...');
+
+                    const results = await Model.scanMarket((msg) => {
+                        View.updateScannerStatus(msg);
+                    });
+
+                    View.renderScannerResults(results);
+                    View.setLoading('#btnStartScan', false);
+                });
+            },
+
+            setupCopyButtons: function () {
+                $('.btn-copy').click(function () {
+                    const targetId = $(this).data('target');
+                    const text = $('#' + targetId).text();
+
+                    if (!text) return;
+
+                    navigator.clipboard.writeText(text).then(() => {
+                        const originalText = $(this).text();
+                        $(this).text('Copied!');
+                        setTimeout(() => {
+                            $(this).text(originalText);
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy: ', err);
+                        alert('Failed to copy text.');
+                    });
+                });
+            }
+        };
+
+        // เริ่มต้นทำงาน
+        $(document).ready(function () {
+            Controller.init();
+        });
+
+    </script>
+</body>
+
+</html>
