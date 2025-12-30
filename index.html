@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Daily Scanner (Swing Trade)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body {
+            background-color: #0f1115;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .card {
+            background-color: #1a1d24;
+            border: 1px solid #2b313a;
+        }
+
+        .table {
+            color: #e0e0e0;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #2b313a;
+        }
+
+        /* ทำให้หัวตารางคลิกได้ */
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th.sortable:hover {
+            background-color: #3b414d;
+            color: #fff;
+        }
+
+        .text-green {
+            color: #00e676 !important;
+        }
+
+        .text-red {
+            color: #ff5252 !important;
+        }
+
+        .text-gray {
+            color: #6c757d !important;
+        }
+
+        .badge-sl {
+            background-color: rgba(255, 82, 82, 0.1);
+            color: #ff5252;
+            border: 1px solid #ff5252;
+            cursor: help;
+        }
+
+        .badge-tp {
+            background-color: rgba(0, 230, 118, 0.1);
+            color: #00e676;
+            border: 1px solid #00e676;
+        }
+
+        .risk-box {
+            font-size: 0.8rem;
+            background: #263238;
+            padding: 4px;
+            border-radius: 4px;
+            border-left: 3px solid #ff9800;
+        }
+
+        .scan-info {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container-fluid mt-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+            <div>
+                <h3 class="mb-0">📅 Binance Daily Scanner</h3>
+                <div id="scanStatus" class="scan-info">Ready for Daily Swing Trading...</div>
+            </div>
+            <div class="text-end">
+                <div id="btcStatus" class="d-inline-block px-3 py-2 rounded border border-secondary bg-dark me-2 mb-2">
+                    Wait...</div>
+                <button id="btnScan" class="btn btn-warning fw-bold mb-2">☀️ SCAN DAILY (1D)</button>
+            </div>
+        </div>
+
+        <div class="row mb-3 g-2">
+            <div class="col-auto">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-white border-secondary">ทุนพอร์ต ($)</span>
+                    <input type="number" id="portfolioSize" class="form-control bg-dark text-white border-secondary"
+                        value="1000">
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-dark text-white border-secondary">ความเสี่ยง (%)</span>
+                    <input type="number" id="riskPercent" class="form-control bg-dark text-white border-secondary"
+                        value="1.5">
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0" id="mainTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th class="sortable" onclick="sortTable('symbol')">Symbol ⇅</th>
+                            <th class="sortable" onclick="sortTable('price')">Price ⇅</th>
+                            <th>Trend (EMA)</th>
+                            <th>Vol / Momentum</th>
+                            <th class="sortable" onclick="sortTable('score')">Score ⇅</th>
+                            <th>Swing Plan (SL/TP)</th>
+                            <th>Risk Mgt.</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="marketTable">
+                        <tr>
+                            <td colspan="9" class="text-center p-5 text-muted">กดปุ่ม Scan เพื่อค้นหาหุ้นต้นรอบใน
+                                Timeframe Day <br> (สามารถกดที่หัวตารางเพื่อเรียงลำดับได้หลังจากสแกนเสร็จ)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // *** ปรับเป็น 1d (Daily) ***
+        const TIMEFRAME = "1d";
+        const MAX_COINS = 50;
+        const MIN_VOLUME_USDT = 10000000;
+
+        let btcTrend = "NEUTRAL";
+        let sortDirection = {}; // เก็บสถานะการเรียงลำดับ (asc/desc)
+
+        // --- HELPER: SLEEP FUNCTION ---
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        // --- INDICATORS ---
+        function calculateSMA(data, period) {
+            if (data.length < period) return 0;
+            let sum = 0;
+            for (let i = data.length - period; i < data.length; i++) sum += parseFloat(data[i]);
+            return sum / period;
+        }
+
+        function calculateEMA(data, period) {
+            if (data.length < period) return 0;
+            const k = 2 / (period + 1);
+            let sum = 0;
+            for (let i = 0; i < period; i++) sum += data[i];
+            let ema = sum / period;
+            for (let i = period; i < data.length; i++) {
+                ema = (data[i] * k) + (ema * (1 - k));
+            }
+            return ema;
+        }
+
+        function getEMAArray(data, period) {
+            if (data.length < period) return [];
+            const k = 2 / (period + 1);
+            let emaArray = [];
+            let sum = 0;
+            for (let i = 0; i < period; i++) sum += data[i];
+            let prevEma = sum / period;
+            emaArray.push(prevEma);
+            for (let i = period; i < data.length; i++) {
+                let ema = (data[i] * k) + (prevEma * (1 - k));
+                emaArray.push(ema);
+                prevEma = ema;
+            }
+            return emaArray;
+        }
+
+        function calculateMACD(closes) {
+            let ema12 = getEMAArray(closes, 12);
+            let ema26 = getEMAArray(closes, 26);
+            if (ema26.length === 0) return { macd: 0, signal: 0, hist: 0 };
+            let macdLine = [];
+            for (let i = 0; i < ema26.length; i++) {
+                let val12 = ema12[i + 14];
+                let val26 = ema26[i];
+                macdLine.push(val12 - val26);
+            }
+            let signalLineArr = getEMAArray(macdLine, 9);
+            if (signalLineArr.length === 0) return { macd: 0, signal: 0, hist: 0 };
+            let lastMacd = macdLine[macdLine.length - 1];
+            let lastSignal = signalLineArr[signalLineArr.length - 1];
+            return {
+                macd: lastMacd,
+                signal: lastSignal,
+                hist: lastMacd - lastSignal
+            };
+        }
+
+        function calculateRSI(prices, period = 14) {
+            if (prices.length < period + 1) return 50;
+            let gains = 0, losses = 0;
+            for (let i = prices.length - period - 1; i < prices.length - 1; i++) {
+                let change = prices[i + 1] - prices[i];
+                if (change > 0) gains += change; else losses += Math.abs(change);
+            }
+            if (losses === 0) return 100;
+            return 100 - (100 / (1 + (gains / period) / (losses / period)));
+        }
+
+        function calculateATR(klines, period = 14) {
+            let trValues = [];
+            for (let i = 1; i < klines.length; i++) {
+                let high = parseFloat(klines[i][2]);
+                let low = parseFloat(klines[i][3]);
+                let closePrev = parseFloat(klines[i - 1][4]);
+                trValues.push(Math.max(high - low, Math.abs(high - closePrev), Math.abs(low - closePrev)));
+            }
+            if (trValues.length < period) return 0;
+            let sum = 0;
+            for (let i = trValues.length - period; i < trValues.length; i++) sum += trValues[i];
+            return sum / period;
+        }
+
+        // --- DATA FETCHING ---
+        async function getTopVolumeSymbols() {
+            $("#scanStatus").text("Fetching tickers...");
+            try {
+                let tickers = await $.get("https://api.binance.com/api/v3/ticker/24hr");
+                let interestingCoins = tickers
+                    .filter(t => t.symbol.endsWith("USDT"))
+                    .filter(t => !t.symbol.includes("UPUSDT") && !t.symbol.includes("DOWNUSDT"))
+                    .filter(t => !["USDCUSDT", "FDUSDUSDT", "TUSDUSDT", "USDPUSDT", "BUSDUSDT", "EURUSDT", "USDTUSDT"].includes(t.symbol))
+                    .filter(t => parseFloat(t.quoteVolume) >= MIN_VOLUME_USDT)
+                    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+                    .slice(0, MAX_COINS);
+                return interestingCoins.map(t => t.symbol);
+            } catch (e) {
+                console.error(e);
+                return [];
+            }
+        }
+
+        function analyzeToken(symbol, klines) {
+            let closes = klines.map(k => parseFloat(k[4]));
+            let volumes = klines.map(k => parseFloat(k[5]));
+            let currentPrice = closes[closes.length - 1];
+            let currentVol = volumes[volumes.length - 1];
+
+            // Indicators
+            let rsi = calculateRSI(closes);
+            let ema50 = calculateEMA(closes, 50);
+            let ema200 = calculateEMA(closes, 200);
+            let avgVol20 = calculateSMA(volumes, 20);
+            let macdData = calculateMACD(closes);
+            let atr = calculateATR(klines);
+
+            let score = 0;
+            let reasons = [];
+
+            if (currentPrice > ema200) { score += 30; reasons.push("Upside Trend"); }
+            if (currentPrice > ema50) { score += 10; }
+
+            let isMacdBullish = macdData.hist > 0 && macdData.macd > macdData.signal;
+            if (isMacdBullish) { score += 20; reasons.push("MACD Bullish"); }
+
+            if (currentVol > avgVol20) { score += 10; reasons.push("High Volume"); }
+
+            if (rsi >= 40 && rsi <= 60) { score += 10; }
+            else if (rsi < 30) { score += 20; reasons.push("RSI Oversold"); }
+            else if (rsi > 70 && currentPrice > ema50) { score += 10; reasons.push("Str. Momentum"); }
+
+            if (btcTrend === "BULLISH") { score += 10; }
+            else { reasons.push("BTC Weak"); }
+
+            score = Math.min(100, score);
+
+            let action = "WAIT";
+            let colorClass = "text-gray";
+            if (score >= 70) { action = "STRONG BUY"; colorClass = "text-green"; }
+            else if (score >= 50) { action = "WATCH"; colorClass = "text-warning"; }
+            else { action = "AVOID"; colorClass = "text-red"; }
+
+            let slPrice = currentPrice - (2 * atr);
+            let tpPrice = currentPrice + (3 * atr);
+            let riskPerShare = currentPrice - slPrice;
+
+            let portfolio = parseFloat($("#portfolioSize").val()) || 1000;
+            let riskPct = parseFloat($("#riskPercent").val()) || 1;
+            let moneyAtRisk = (portfolio * riskPct) / 100;
+
+            let positionSize = (riskPerShare > 0) ? (moneyAtRisk / riskPerShare) : 0;
+            let totalCost = positionSize * currentPrice;
+
+            return {
+                symbol,
+                price: currentPrice,
+                score,
+                action,
+                colorClass,
+                rsi: rsi.toFixed(1),
+                trend: (currentPrice > ema200) ? "UP (EMA200)" : "DOWN",
+                macdHist: macdData.hist,
+                isVolHigh: currentVol > avgVol20,
+                sl: slPrice,
+                tp: tpPrice,
+                size: positionSize,
+                cost: totalCost,
+                reasons: reasons.join(", ")
+            };
+        }
+
+        // *** SORT FUNCTION ***
+        function sortTable(key) {
+            const table = document.getElementById("marketTable");
+            const rows = Array.from(table.getElementsByTagName("tr"));
+
+            // Toggle direction
+            if (!sortDirection[key] || sortDirection[key] === 'asc') {
+                sortDirection[key] = 'desc';
+            } else {
+                sortDirection[key] = 'asc';
+            }
+
+            const direction = sortDirection[key];
+
+            rows.sort((a, b) => {
+                let valA, valB;
+
+                // ดึงค่าจาก data attribute
+                if (key === 'symbol') {
+                    valA = a.dataset.symbol || "";
+                    valB = b.dataset.symbol || "";
+                } else if (key === 'score') {
+                    valA = parseFloat(a.dataset.score) || 0;
+                    valB = parseFloat(b.dataset.score) || 0;
+                } else if (key === 'price') {
+                    valA = parseFloat(a.dataset.price) || 0;
+                    valB = parseFloat(b.dataset.price) || 0;
+                }
+
+                if (valA < valB) return direction === 'asc' ? -1 : 1;
+                if (valA > valB) return direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            // ลบแถวเก่าและใส่แถวที่เรียงใหม่เข้าไป
+            table.innerHTML = "";
+            rows.forEach(row => table.appendChild(row));
+        }
+
+        // --- MAIN ---
+        $(document).ready(function () {
+            $("#btnScan").click(async function () {
+                let table = $("#marketTable");
+                let status = $("#scanStatus");
+                table.html('');
+
+                // 1. Check BTC Trend
+                try {
+                    let btcData = await $.get(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=200`);
+                    let closes = btcData.map(k => parseFloat(k[4]));
+                    let price = closes[closes.length - 1];
+                    let ema50 = calculateEMA(closes, 50);
+                    if (price > ema50) {
+                        btcTrend = "BULLISH";
+                        $("#btcStatus").html(`<span class="text-green fw-bold">BTC DAY: BULLISH</span>`).removeClass("border-secondary").addClass("border-success");
+                    } else {
+                        btcTrend = "BEARISH";
+                        $("#btcStatus").html(`<span class="text-red fw-bold">BTC DAY: BEARISH</span>`).removeClass("border-secondary").addClass("border-danger");
+                    }
+                } catch (e) { console.error("BTC API Error", e); }
+
+                // 2. Get Symbols
+                let symbols = await getTopVolumeSymbols();
+                status.text(`Found ${symbols.length} coins. Scanning Daily Candles...`);
+
+                let count = 0;
+                for (let symbol of symbols) {
+                    await delay(150);
+
+                    try {
+                        let data = await $.get(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${TIMEFRAME}&limit=200`);
+                        let res = analyzeToken(symbol, data);
+
+                        let volBadge = res.isVolHigh ? '<span class="badge bg-warning text-dark">Vol</span>' : '<span class="badge bg-dark text-secondary border border-secondary">Low Vol</span>';
+                        let macdBadge = res.macdHist > 0 ? '<span class="text-green">MACD+</span>' : '<span class="text-red">MACD-</span>';
+
+                        // *** เพิ่ม data-score, data-price, data-symbol ใน <tr> เพื่อใช้สำหรับ sort ***
+                        let rowHtml = `
+                        <tr style="border-bottom: 1px solid #2b313a;" 
+                            data-score="${res.score}" 
+                            data-price="${res.price}" 
+                            data-symbol="${res.symbol}">
+                            
+                            <td>${count + 1}</td>
+                            <td>
+                                <a href="https://www.tradingview.com/chart/?symbol=${res.symbol}" target="_blank"><strong>${res.symbol}</strong></a>
+                                <br><span style="font-size:0.7rem; color:#aaa;">${res.reasons}</span>
+                            </td>
+                            <td>$${res.price < 1 ? res.price.toFixed(4) : res.price.toLocaleString()}</td>
+                            <td>
+                                <span class="${res.trend.includes('UP') ? 'text-green' : 'text-red'}">${res.trend}</span><br>
+                                <small class="text-muted">RSI: ${res.rsi}</small>
+                            </td>
+                            <td>
+                                ${volBadge} <br> ${macdBadge}
+                            </td>
+                            <td>
+                                <div class="progress" style="height: 6px; width: 60px; background:#333;">
+                                    <div class="progress-bar ${res.score >= 50 ? 'bg-success' : 'bg-danger'}" style="width: ${res.score}%"></div>
+                                </div>
+                                <small>${res.score}/100</small>
+                            </td>
+                            <td>
+                                <span class="badge badge-sl">SL: ${res.sl < 1 ? res.sl.toFixed(4) : res.sl.toFixed(2)}</span><br>
+                                <span class="badge badge-tp mt-1">TP: ${res.tp < 1 ? res.tp.toFixed(4) : res.tp.toFixed(2)}</span>
+                            </td>
+                            <td><div class="risk-box">Size: ${res.size.toFixed(1)}<br>$${res.cost.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div></td>
+                            <td><h6 class="${res.colorClass} fw-bold">${res.action}</h6></td>
+                        </tr>
+                    `;
+                        table.append(rowHtml);
+                        count++;
+                        status.text(`Analyzed ${count}/${symbols.length}: ${symbol} (Score: ${res.score})`);
+
+                    } catch (err) {
+                        console.log(`Failed to load ${symbol}:`, err);
+                        status.text(`Skipped ${symbol}...`);
+                    }
+                }
+                status.text(`Daily Scan Completed! Analyzed ${count} coins. Click Header to Sort.`);
+
+                // Optional: Auto sort by score when done
+                sortTable('score');
+            });
+        });
+    </script>
+
+</body>
+
+</html>
